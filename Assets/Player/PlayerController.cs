@@ -12,6 +12,9 @@ public class PlayerController : MonoBehaviour
     public float xSpeed = 0f;
     public float ySpeed = 0f;
     public float groundedCheckDis = 0.05f;
+    public float jumpHeight;
+    public float grav;
+    public float jumpGravMod;
 
     public bool isGrounded = true;
     public bool canJump = true;
@@ -21,11 +24,16 @@ public class PlayerController : MonoBehaviour
     public LayerMask groundLayer;
 
     private float xInput = 0f;
+    private float jumpSpeed = 0f;
+    private float jumpGrav
+
+    private bool wantsJump = false;
 
     // Start is called before the first frame update
     void Start()
     {
-        
+        jumpGrav = grav * jumpGravMod;
+        jumpSpeed = -2 * jumpGrav * jumpHeight;
     }
 
     // Update is called once per frame
@@ -45,6 +53,11 @@ public class PlayerController : MonoBehaviour
     void CheckInput()
     {
         xInput = Input.GetAxisRaw("Horizontal");
+    }
+
+    void CheckJumpInput()
+    {
+        //ndk
     }
 
     void SetHorizontalSpeed()
