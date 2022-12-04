@@ -20,14 +20,21 @@ public class PlayerController : MonoBehaviour
     public float jumpGravMod;
     public float jumpBufferTime = .1f;
     public float maxFallSpeed = 0.35f;
+    public float coyoteTime = .1f;
 
     public bool isGrounded = true;
+    public bool blockedRight = false;
+    public bool blockedLeft = false;
+    public bool blockedTop = false;
     public bool jumpPressed = false;
 
     public Transform self;
     public Transform sprite;
 
     public Transform[] groundedOrigin = new Transform[3];
+    public Transform[] rightCheckOrigins = new Transform[3];
+    public Transform[] leftCheckOrigins = new Transform[3];
+    public Transform[] upCheckOrigins = new Transform[3];
 
     public LayerMask groundLayer;
 
@@ -38,6 +45,8 @@ public class PlayerController : MonoBehaviour
     private float jumpTimer;
     private float jumpXAccel;
     private float jumpXDecel;
+    [SerializeField]
+    private float coyoteTimer;
 
     [SerializeField]
     private bool wantsJump = false;
@@ -47,6 +56,8 @@ public class PlayerController : MonoBehaviour
     private bool isJumping = false;
     [SerializeField]
     private bool isJumpingTemp = false;
+    [SerializeField]
+    private bool isCoyote = false;
 
     // Start is called before the first frame update
     void Start()
@@ -64,19 +75,48 @@ public class PlayerController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        print(jumpSpeed);
+        //print(jumpSpeed);
 
         CheckInput();
         CheckJumpInput();
         SetHorizontalSpeed();
         SetVerticalSpeed();
+        CheckCoyote();
     }
 
     void FixedUpdate()
     {
         StartJump();
 
+        /*
         CheckGrounded();
+
+        if (xInput != 0f & !blockedTop)
+        {
+            if (xInput > 0f)
+            {
+                CheckRightCollisions();
+            }
+            else
+            {
+                CheckLeftCollisions();
+            }
+        }
+
+        //CheckGrounded();
+
+        if (!isGrounded)
+        {
+            CheckTopCollisions();
+        }
+        */
+
+        //DO NOT WORK PROPERLY. TRY TO FIND A WAY TO GET UNITY TO HANDLE COLLSIIONS. CAN A KINEMATIC RIGIDBODY HAVE COLLISIONS HANDLED BY UNITY?
+        //USE HIT.POINT TO GET THE ACTUAL POINT COORDINATES
+        //THAT SHOULD WORK
+        //CheckLeftCollisions();
+        //CheckRightCollisions();
+        //CheckTopCollisions();
 
         Move();
     }
@@ -120,6 +160,8 @@ public class PlayerController : MonoBehaviour
         {
             if (xInput > 0)
             {
+                blockedLeft = false;
+                
                 if (xSpeed < 0)
                 {
                     xSpeed = 0 + accel * Time.deltaTime;
@@ -132,9 +174,16 @@ public class PlayerController : MonoBehaviour
                 {
                     xSpeed = maxXSpeed * xInput;
                 }
+
+                if (blockedRight)
+                {
+                    xSpeed = 0f;
+                }
             }
             else
             {
+                blockedRight = false;
+
                 if (xSpeed > 0)
                 {
                     xSpeed = 0 + accel * Time.deltaTime;
@@ -146,6 +195,11 @@ public class PlayerController : MonoBehaviour
                 else
                 {
                     xSpeed = maxXSpeed * xInput;
+                }
+
+                if (blockedLeft)
+                {
+                    xSpeed = 0f;
                 }
             }
         }
@@ -259,17 +313,23 @@ public class PlayerController : MonoBehaviour
                 ySpeed = 0f;
             }
         }
+
+        if (blockedTop)
+        {
+            StopJump(-0.05f);
+        }
     }
 
     void StartJump()
     {
         if (wantsJump)
         {
-            if (isGrounded)
+            if (isGrounded || isCoyote)
             {
                 Jump();
                 wantsJump = false;
                 isGrounded = false;
+                isCoyote = false;
             }
             else
             {
@@ -321,7 +381,20 @@ public class PlayerController : MonoBehaviour
     Vector3 CreateMovVector()
     {
         //IF SLOPES ARE IMPLEMENTED MAKE SURE TO CHANGE THE X SPEED TO ALSO AFFECT THE Y SPEED
-        Vector3 mov = new Vector3(xSpeed, ySpeed, 0f);
+        float y_pos_min = CheckGround();
+        float y_pos_max = CheckTopColl();
+        float x_pos_max = CheckRightColl();
+        float x_pos_min = CheckLeftColl();
+
+        float new_x_pos = self.transform.position.x + xSpeed;
+        float new_y_pos = self.transform.position.y + ySpeed;
+
+        new_x_pos = Mathf.Clamp(new_x_pos, x_pos_min, x_pos_max);
+        new_y_pos = Mathf.Clamp(new_y_pos, y_pos_min, y_pos_max);
+
+        Vector3 mov = new Vector3(new_x_pos - self.transform.position.x, new_y_pos - self.transform.position.y, 0f);
+
+        //Vector3 mov = new Vector3(xSpeed, ySpeed, 0f);
         return mov;
     }
 
@@ -348,14 +421,41 @@ public class PlayerController : MonoBehaviour
 
         if (hit)
         {
-            print(hit.transform.position);
+            //print(hit.transform.position);
+            //print(hit.point.y);
+
+            Vector2 surfacePoint = hit.collider.ClosestPoint(hit.point);
+            Vector2 point = hit.point;
+            float dist = 0f;
+
+            while (surfacePoint == point)
+            {
+                point = new Vector2(point.x, point.y + groundedCheckDis * 0.1f);
+                dist += groundedCheckDis * 0.1f;
+                surfacePoint = hit.collider.ClosestPoint(point);
+
+                if (surfacePoint == point & dist > groundedCheckDis + 1f)
+                {
+                    break;
+                }
+            }
+
+            //print(surfacePoint.y);
+
             if (!isJumping)
             {
                 isGrounded = true;
+                blockedTop = false;
                 //float heightPosition = hit.transform.position.y + (self.transform.position.y - groundedOrigin.position.y);
 
-                float y_pos = Mathf.Clamp(self.transform.position.y, hit.transform.position.y + self.lossyScale.y / 2, Mathf.Infinity);
-                self.transform.position = new Vector3(self.transform.position.x, y_pos, self.transform.position.z);
+                //float y_pos = Mathf.Clamp(self.transform.position.y, hit.transform.position.y + self.lossyScale.y / 2, Mathf.Infinity);
+                if (surfacePoint != point)
+                {
+                    float y_pos = Mathf.Clamp(self.transform.position.y, surfacePoint.y, Mathf.Infinity);
+                    self.transform.position = new Vector3(self.transform.position.x, y_pos, self.transform.position.z);
+                }
+                //float y_pos = Mathf.Clamp(self.transform.position.y, surfacePoint.y, Mathf.Infinity);
+                //self.transform.position = new Vector3(self.transform.position.x, y_pos, self.transform.position.z);
 
 
                 //self.transform.position = new Vector3(self.transform.position.x, hit.transform.position.y + self.lossyScale.y / 2, self.transform.position.z);
@@ -364,7 +464,449 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
+            if (isGrounded & !isJumping)
+            {
+                coyoteTimer = coyoteTime;
+                isCoyote = true;
+            }
             isGrounded = false;
         }
+    }
+
+    float CheckGround()
+    {
+        float y_pos_min = 0f;
+        RaycastHit2D hit = new RaycastHit2D();
+        //isGrounded = Physics2D.Raycast(groundedOrigin.position, -gameObject.transform.up, groundedCheckDis, groundLayer);
+        foreach (Transform groundOrigin in groundedOrigin)
+        {
+            hit = Physics2D.Raycast(groundOrigin.position, -self.transform.up, groundedCheckDis, groundLayer, -Mathf.Infinity, Mathf.Infinity);
+            if (hit)
+            {
+                break;
+            }
+        }
+
+        if (hit)
+        {
+            Vector2 surfacePoint = hit.collider.ClosestPoint(hit.point);
+            Vector2 point = hit.point;
+            float dist = 0f;
+
+            while (surfacePoint == point)
+            {
+                point = new Vector2(point.x, point.y + groundedCheckDis * 0.1f);
+                dist += groundedCheckDis * 0.1f;
+                surfacePoint = hit.collider.ClosestPoint(point);
+
+                if (surfacePoint == point & dist > groundedCheckDis + 1f)
+                {
+                    break;
+                }
+            }
+
+            if (!isJumping)
+            {
+                isGrounded = true;
+
+                if (surfacePoint != point)
+                {
+                    y_pos_min = surfacePoint.y;
+                }
+                else
+                {
+                    y_pos_min = -Mathf.Infinity;
+                }
+            }
+            else
+            {
+                if (isGrounded & !isJumping)
+                {
+                    coyoteTimer = coyoteTime;
+                    isCoyote = true;
+                }
+                isGrounded = false;
+                y_pos_min = -Mathf.Infinity;
+            }
+        }
+
+        return y_pos_min;
+    }
+
+    void CheckCoyote()
+    {
+        if (isCoyote)
+        {
+            if (coyoteTimer > 0)
+            {
+                coyoteTimer -= Time.deltaTime;
+            }
+            else
+            {
+                isCoyote = false;
+            }
+        }
+    }
+
+    void CheckRightCollisions()
+    {
+        RaycastHit2D hit = new RaycastHit2D();
+
+        Transform[] localRightCheckOrigins;
+
+        if (isGrounded)
+        {
+            localRightCheckOrigins = new Transform[] { rightCheckOrigins[0], rightCheckOrigins[2] };
+        }
+        else
+        {
+            localRightCheckOrigins = rightCheckOrigins;
+        }
+
+        foreach (Transform rightOrigin in localRightCheckOrigins)
+        {
+            hit = Physics2D.Raycast(rightOrigin.position, self.transform.right, groundedCheckDis, groundLayer, -Mathf.Infinity, Mathf.Infinity);
+            if (hit)
+            {
+                break;
+            }
+        }
+
+        if (hit)
+        {
+            //FINISH THIS
+
+            Vector2 surfacePoint = hit.collider.ClosestPoint(hit.point);
+            Vector2 point = hit.point;
+            float dist = 0f;
+
+            while (surfacePoint == point)
+            {
+                point = new Vector2(point.x - groundedCheckDis * 0.1f, point.y);
+                dist += groundedCheckDis * 0.1f;
+                surfacePoint = hit.collider.ClosestPoint(point);
+                if (dist > groundedCheckDis + 1f & surfacePoint == point)
+                {
+                    break;
+                }
+            }
+
+
+            blockedRight = true;
+            if (surfacePoint != point)
+            {
+                float x_pos = Mathf.Clamp(self.transform.position.x, -Mathf.Infinity, surfacePoint.x - self.lossyScale.x / 2);
+                self.transform.position = new Vector3(x_pos, self.transform.position.y, self.transform.position.z);
+            }
+            //float x_pos = Mathf.Clamp(self.transform.position.x, -Mathf.Infinity, surfacePoint.x);
+            //self.transform.position = new Vector3(x_pos, self.transform.position.y, self.transform.position.z);
+
+        }
+        else
+        {
+            blockedRight = false;
+        }
+    }
+
+    float CheckRightColl()
+    {
+        float x_pos_max;
+        RaycastHit2D hit = new RaycastHit2D();
+
+        Transform[] localRightCheckOrigins;
+
+        if (isGrounded)
+        {
+            localRightCheckOrigins = new Transform[] { rightCheckOrigins[0], rightCheckOrigins[2] };
+        }
+        else
+        {
+            localRightCheckOrigins = rightCheckOrigins;
+        }
+
+        foreach (Transform rightOrigin in localRightCheckOrigins)
+        {
+            hit = Physics2D.Raycast(rightOrigin.position, self.transform.right, groundedCheckDis, groundLayer, -Mathf.Infinity, Mathf.Infinity);
+            if (hit)
+            {
+                break;
+            }
+        }
+
+        if (hit)
+        {
+            Vector2 surfacePoint = hit.collider.ClosestPoint(hit.point);
+            Vector2 point = hit.point;
+            float dist = 0f;
+
+            while (surfacePoint == point)
+            {
+                point = new Vector2(point.x - groundedCheckDis * 0.1f, point.y);
+                dist += groundedCheckDis * 0.1f;
+                surfacePoint = hit.collider.ClosestPoint(point);
+                if (dist > groundedCheckDis + 1f & surfacePoint == point)
+                {
+                    break;
+                }
+            }
+
+            //IF SYSTEM DOES NOT WORK PUT THIS LINE INSIDE THE FOLLOWING IF STATEMENT THE SAME WAY AS IN TEH CHECKGROUNDED FUNCTION
+            // ||
+            // VV
+            blockedRight = true;
+            if (surfacePoint != point)
+            {
+                x_pos_max = surfacePoint.x - self.lossyScale.x / 2;
+            }
+            else
+            {
+                x_pos_max = Mathf.Infinity;
+            }
+        }
+        else
+        {
+            x_pos_max = Mathf.Infinity;
+            blockedRight = false;
+        }
+
+        return x_pos_max;
+    }
+
+    void CheckLeftCollisions()
+    {
+        RaycastHit2D hit = new RaycastHit2D();
+        Transform[] localLeftCheckOrigins;
+
+        if (isGrounded)
+        {
+            localLeftCheckOrigins = new Transform[] { leftCheckOrigins[0], leftCheckOrigins[2] };
+        }
+        else
+        {
+            localLeftCheckOrigins = leftCheckOrigins;
+        }
+
+        foreach (Transform leftOrigin in localLeftCheckOrigins)
+        {
+            hit = Physics2D.Raycast(leftOrigin.position, -self.transform.right, groundedCheckDis, groundLayer, -Mathf.Infinity, Mathf.Infinity);
+            if (hit)
+            {
+                break;
+            }
+        }
+
+        if (hit)
+        {
+            Vector2 surfacePoint = hit.collider.ClosestPoint(hit.point);
+            Vector2 point = hit.point;
+            float dist = 0f;
+
+            while (surfacePoint == point)
+            {
+                point = new Vector2(point.x + groundedCheckDis * 0.1f, point.y);
+                dist += groundedCheckDis * 0.1f;
+                surfacePoint = hit.collider.ClosestPoint(point);
+
+                if (dist > groundedCheckDis + 1f & surfacePoint == point)
+                {
+                    break;
+                }
+            }
+
+
+            blockedLeft = true;
+            if (surfacePoint != point)
+            {
+                float x_pos = Mathf.Clamp(self.transform.position.x, surfacePoint.x + self.lossyScale.x / 2, Mathf.Infinity);
+                self.transform.position = new Vector3(x_pos, self.transform.position.y, self.transform.position.z);
+            }
+            //float x_pos = Mathf.Clamp(self.transform.position.x, surfacePoint.x, Mathf.Infinity);
+            //self.transform.position = new Vector3(x_pos, self.transform.position.y, self.transform.position.z);
+
+        }
+        else
+        {
+            blockedLeft = false;
+        }
+    }
+
+    float CheckLeftColl()
+    {
+        float x_pos_min = 0f;
+        RaycastHit2D hit = new RaycastHit2D();
+        Transform[] localLeftCheckOrigins;
+
+        if (isGrounded)
+        {
+            localLeftCheckOrigins = new Transform[] { leftCheckOrigins[0], leftCheckOrigins[2] };
+        }
+        else
+        {
+            localLeftCheckOrigins = leftCheckOrigins;
+        }
+
+        foreach (Transform leftOrigin in localLeftCheckOrigins)
+        {
+            hit = Physics2D.Raycast(leftOrigin.position, -self.transform.right, groundedCheckDis, groundLayer, -Mathf.Infinity, Mathf.Infinity);
+            if (hit)
+            {
+                break;
+            }
+        }
+
+        if (hit)
+        {
+            Vector2 surfacePoint = hit.collider.ClosestPoint(hit.point);
+            Vector2 point = hit.point;
+            float dist = 0f;
+
+            while (surfacePoint == point)
+            {
+                point = new Vector2(point.x + groundedCheckDis * 0.1f, point.y);
+                dist += groundedCheckDis * 0.1f;
+                surfacePoint = hit.collider.ClosestPoint(point);
+
+                if (dist > groundedCheckDis + 1f & surfacePoint == point)
+                {
+                    break;
+                }
+            }
+
+            blockedLeft = true;
+            if (surfacePoint != point)
+            {
+                x_pos_min = surfacePoint.x + self.lossyScale.x / 2;
+            }
+            else
+            {
+                x_pos_min = -Mathf.Infinity;
+            }
+        }
+        else
+        {
+            x_pos_min = -Mathf.Infinity;
+            blockedLeft = false;
+        }
+
+        return x_pos_min;
+    }
+
+    void CheckTopCollisions()
+    {
+        RaycastHit2D hit = new RaycastHit2D();
+        Transform[] localUpCheckOrigins;
+
+        if (blockedLeft)
+        {
+            localUpCheckOrigins = new Transform[] { upCheckOrigins[0], upCheckOrigins[1] };
+        }
+        else if (blockedLeft)
+        {
+            localUpCheckOrigins = new Transform[] { upCheckOrigins[0], upCheckOrigins[2] };
+        }
+        else
+        {
+            localUpCheckOrigins = upCheckOrigins;
+        }
+
+        foreach (Transform topOrigin in localUpCheckOrigins)
+        {
+            hit = Physics2D.Raycast(topOrigin.position, self.transform.up, groundedCheckDis, groundLayer, -Mathf.Infinity, Mathf.Infinity);
+            if (hit)
+            {
+                break;
+            }
+        }
+
+        if (hit)
+        {
+            
+            Vector2 surfacePoint = hit.collider.ClosestPoint(hit.point);
+            Vector2 point = hit.point;
+            float dist = 0f;
+
+            while (surfacePoint == point)
+            {
+                point = new Vector2(point.y - groundedCheckDis * 0.1f, point.y);
+                dist += groundedCheckDis * 0.1f;
+                surfacePoint = hit.collider.ClosestPoint(point);
+
+                if (dist > groundedCheckDis + 1f & surfacePoint == point)
+                {
+                    break;
+                }
+            }
+            
+
+
+            blockedTop = true;
+
+            if (surfacePoint != point)
+            {
+                float y_pos = Mathf.Clamp(self.transform.position.y, -Mathf.Infinity, surfacePoint.y - self.lossyScale.y);
+                self.transform.position = new Vector3(self.transform.position.x, y_pos, self.transform.position.z);
+            }
+
+            //MIGHT CAUSE PLAYER TO GET STUCK ON ROOFS
+            //float y_pos = Mathf.Clamp(self.transform.position.y, -Mathf.Infinity, surfacePoint.y);
+            //self.transform.position = new Vector3(self.transform.position.x, y_pos, self.transform.position.z);
+
+        }
+        else
+        {
+            blockedTop = false;
+        }
+    }
+
+    float CheckTopColl()
+    {
+        float y_pos_max = 0f;
+        RaycastHit2D hit = new RaycastHit2D();
+
+        foreach (Transform topOrigin in upCheckOrigins)
+        {
+            hit = Physics2D.Raycast(topOrigin.position, self.transform.up, groundedCheckDis, groundLayer, -Mathf.Infinity, Mathf.Infinity);
+            if (hit)
+            {
+                break;
+            }
+        }
+
+        if (hit)
+        {
+            Vector2 surfacePoint = hit.collider.ClosestPoint(hit.point);
+            Vector2 point = hit.point;
+            float dist = 0f;
+
+            while (surfacePoint == point)
+            {
+                point = new Vector2(point.y - groundedCheckDis * 0.1f, point.y);
+                dist += groundedCheckDis * 0.1f;
+                surfacePoint = hit.collider.ClosestPoint(point);
+
+                if (dist > groundedCheckDis + 1f & surfacePoint == point)
+                {
+                    break;
+                }
+            }
+
+            blockedTop = true;
+
+            if (surfacePoint != point)
+            {
+                y_pos_max = surfacePoint.y - self.lossyScale.y;
+            }
+            else
+            {
+                y_pos_max = Mathf.Infinity;
+            }
+        }
+        else
+        {
+            y_pos_max = Mathf.Infinity;
+            blockedTop = false;
+        }
+
+        return y_pos_max;
     }
 }
