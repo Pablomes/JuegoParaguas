@@ -82,11 +82,12 @@ public class PlayerController : MonoBehaviour
         SetHorizontalSpeed();
         SetVerticalSpeed();
         CheckCoyote();
+        StartJump();
     }
 
     void FixedUpdate()
     {
-        StartJump();
+        //StartJump();
 
         /*
         CheckGrounded();
@@ -109,7 +110,7 @@ public class PlayerController : MonoBehaviour
         {
             CheckTopCollisions();
         }
-        */
+        
 
         //DO NOT WORK PROPERLY. TRY TO FIND A WAY TO GET UNITY TO HANDLE COLLSIIONS. CAN A KINEMATIC RIGIDBODY HAVE COLLISIONS HANDLED BY UNITY?
         //USE HIT.POINT TO GET THE ACTUAL POINT COORDINATES
@@ -117,6 +118,7 @@ public class PlayerController : MonoBehaviour
         //CheckLeftCollisions();
         //CheckRightCollisions();
         //CheckTopCollisions();
+        */
 
         Move();
     }
@@ -357,7 +359,7 @@ public class PlayerController : MonoBehaviour
                 }
                 else
                 {
-                    jumpBufferTimer -= Time.fixedDeltaTime;
+                    jumpBufferTimer -= Time.deltaTime;
                 }
             }
         }
@@ -381,6 +383,8 @@ public class PlayerController : MonoBehaviour
     Vector3 CreateMovVector()
     {
         //IF SLOPES ARE IMPLEMENTED MAKE SURE TO CHANGE THE X SPEED TO ALSO AFFECT THE Y SPEED
+
+        
         float y_pos_min = CheckGround();
         float y_pos_max = CheckTopColl();
         float x_pos_max = CheckRightColl();
@@ -392,7 +396,11 @@ public class PlayerController : MonoBehaviour
         new_x_pos = Mathf.Clamp(new_x_pos, x_pos_min, x_pos_max);
         new_y_pos = Mathf.Clamp(new_y_pos, y_pos_min, y_pos_max);
 
+        Debug.Log(new_x_pos);
+        Debug.Log(new_y_pos);
+
         Vector3 mov = new Vector3(new_x_pos - self.transform.position.x, new_y_pos - self.transform.position.y, 0f);
+        
 
         //Vector3 mov = new Vector3(xSpeed, ySpeed, 0f);
         return mov;
@@ -518,16 +526,16 @@ public class PlayerController : MonoBehaviour
                     y_pos_min = -Mathf.Infinity;
                 }
             }
-            else
+        }
+        else
+        {
+            if (isGrounded & !isJumping)
             {
-                if (isGrounded & !isJumping)
-                {
-                    coyoteTimer = coyoteTime;
-                    isCoyote = true;
-                }
-                isGrounded = false;
-                y_pos_min = -Mathf.Infinity;
+                coyoteTimer = coyoteTime;
+                isCoyote = true;
             }
+            isGrounded = false;
+            y_pos_min = -Mathf.Infinity;
         }
 
         return y_pos_min;
