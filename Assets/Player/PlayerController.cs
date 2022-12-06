@@ -48,6 +48,8 @@ public class PlayerController : MonoBehaviour
     [SerializeField]
     private float coyoteTimer;
 
+    private Vector2 actualPos;
+
     [SerializeField]
     private bool wantsJump = false;
     [SerializeField]
@@ -87,6 +89,8 @@ public class PlayerController : MonoBehaviour
 
     void FixedUpdate()
     {
+        actualPos = new Vector2(self.transform.position.x, self.transform.position.y);
+
         //StartJump();
 
         /*
@@ -383,23 +387,23 @@ public class PlayerController : MonoBehaviour
     Vector3 CreateMovVector()
     {
         //IF SLOPES ARE IMPLEMENTED MAKE SURE TO CHANGE THE X SPEED TO ALSO AFFECT THE Y SPEED
-
         
         float y_pos_min = CheckGround();
         float y_pos_max = CheckTopColl();
         float x_pos_max = CheckRightColl();
         float x_pos_min = CheckLeftColl();
 
-        float new_x_pos = self.transform.position.x + xSpeed;
-        float new_y_pos = self.transform.position.y + ySpeed;
+        float new_x_pos = actualPos.x + xSpeed;
+        float new_y_pos = actualPos.y + ySpeed;
 
         new_x_pos = Mathf.Clamp(new_x_pos, x_pos_min, x_pos_max);
         new_y_pos = Mathf.Clamp(new_y_pos, y_pos_min, y_pos_max);
 
-        Debug.Log(new_x_pos);
-        Debug.Log(new_y_pos);
+        //Debug.Log(new_x_pos);
+        //Debug.Log(new_y_pos);
+        Debug.Log(actualPos.y);
 
-        Vector3 mov = new Vector3(new_x_pos - self.transform.position.x, new_y_pos - self.transform.position.y, 0f);
+        Vector3 mov = new Vector3(new_x_pos - actualPos.x, new_y_pos - actualPos.y, 0f);
         
 
         //Vector3 mov = new Vector3(xSpeed, ySpeed, 0f);
@@ -483,7 +487,7 @@ public class PlayerController : MonoBehaviour
 
     float CheckGround()
     {
-        float y_pos_min = 0f;
+        float y_pos_min;
         RaycastHit2D hit = new RaycastHit2D();
         //isGrounded = Physics2D.Raycast(groundedOrigin.position, -gameObject.transform.up, groundedCheckDis, groundLayer);
         foreach (Transform groundOrigin in groundedOrigin)
@@ -513,6 +517,8 @@ public class PlayerController : MonoBehaviour
                 }
             }
 
+
+            /*
             if (!isJumping)
             {
                 isGrounded = true;
@@ -525,6 +531,17 @@ public class PlayerController : MonoBehaviour
                 {
                     y_pos_min = -Mathf.Infinity;
                 }
+            }
+            */
+            isGrounded = true;
+
+            if (surfacePoint != point)
+            {
+                y_pos_min = surfacePoint.y;
+            }
+            else
+            {
+                y_pos_min = -Mathf.Infinity;
             }
         }
         else
@@ -740,7 +757,7 @@ public class PlayerController : MonoBehaviour
 
     float CheckLeftColl()
     {
-        float x_pos_min = 0f;
+        float x_pos_min;
         RaycastHit2D hit = new RaycastHit2D();
         Transform[] localLeftCheckOrigins;
 
@@ -868,7 +885,7 @@ public class PlayerController : MonoBehaviour
 
     float CheckTopColl()
     {
-        float y_pos_max = 0f;
+        float y_pos_max;
         RaycastHit2D hit = new RaycastHit2D();
 
         foreach (Transform topOrigin in upCheckOrigins)
