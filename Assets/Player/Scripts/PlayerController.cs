@@ -38,6 +38,8 @@ public class PlayerController : MonoBehaviour
 
     public LayerMask groundLayer;
 
+    public UmbrellaController umbrella;
+
     private float xInput = 0f;
     private float jumpSpeed = 0f;
     private float jumpGrav;
@@ -80,6 +82,7 @@ public class PlayerController : MonoBehaviour
         //print(jumpSpeed);
 
         CheckInput();
+        SetSpriteDirection();
         CheckJumpInput();
         SetHorizontalSpeed();
         SetVerticalSpeed();
@@ -125,6 +128,18 @@ public class PlayerController : MonoBehaviour
         */
 
         Move();
+    }
+
+    void SetSpriteDirection()
+    {
+        if (xInput > 0)
+        {
+            sprite.transform.localScale = new Vector3(1, sprite.transform.localScale.y, sprite.transform.localScale.z);
+        }
+        else if (xInput < 0)
+        {
+            sprite.transform.localScale = new Vector3(-1, sprite.transform.localScale.y, sprite.transform.localScale.z);
+        }
     }
 
     void CheckInput()
